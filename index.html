@@ -177,12 +177,25 @@ auth.onAuthStateChanged(user => {
   }
 });
 
+function isMobile() {
+  return /Mobi|Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+}
+
 document.getElementById('signInBtn').onclick = () => {
   const provider = new firebase.auth.GoogleAuthProvider();
-  auth.signInWithPopup(provider).catch(e => {
-    document.getElementById('authError').textContent = e.message;
-  });
+  if (isMobile()) {
+    auth.signInWithRedirect(provider).catch(e => {
+      document.getElementById('authError').textContent = e.message;
+    });
+  } else {
+    auth.signInWithPopup(provider).catch(e => {
+      document.getElementById('authError').textContent = e.message;
+    });
+  }
 };
+auth.getRedirectResult().catch(e => {
+  document.getElementById('authError').textContent = e.message;
+});
 document.getElementById('signOutBtn').onclick = () => auth.signOut();
 
 function daysSince(ts) {
