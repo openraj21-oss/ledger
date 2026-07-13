@@ -185,7 +185,13 @@ function initGoogleSignIn() {
   });
   const container = document.getElementById('gsiButtonContainer');
   if (container) {
-    google.accounts.id.renderButton(container, { theme: 'filled_black', size: 'large', shape: 'rectangular', width: 300, text: 'continue_with' });
+    // Google's GSI library can lose the race between initialize() and renderButton()
+    // when both are called synchronously — it fails silently (only a console
+    // warning: "Failed to render button before calling initialize()"). A short
+    // delay avoids the race.
+    setTimeout(() => {
+      google.accounts.id.renderButton(container, { theme: 'filled_black', size: 'large', shape: 'rectangular', width: 300, text: 'continue_with' });
+    }, 300);
   }
 }
 function handleGoogleCredential(response) {
