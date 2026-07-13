@@ -178,22 +178,36 @@ auth.onAuthStateChanged(user => {
   }
 });
 
-function initGoogleSignIn() {
+// Google's gsi/client script is supposed to call this via its onload= query
+// param once it's ready, but that callback doesn't reliably fire on every
+// load. So this is also triggered from a DOMContentLoaded fallback below,
+// and it polls until google.accounts.id actually exists instead of assuming
+// the script is ready. There's also a short delay between initialize() and
+// renderButton() — calling them back-to-back races Google's internal setup
+// and fails silently (console warning: "Failed to render button before
+// calling initialize()").
+let gsiRendered = false;
+function initGoogleSignIn(attempt) {
+  attempt = attempt || 0;
+  if (gsiRendered) return;
+  if (!(window.google && google.accounts && google.accounts.id)) {
+    if (attempt < 50) setTimeout(() => initGoogleSignIn(attempt + 1), 100);
+    return;
+  }
   google.accounts.id.initialize({
     client_id: '548246807473-1ic15ldelhaksi9ptn9v6c8l7tdk3d5i.apps.googleusercontent.com',
     callback: handleGoogleCredential
   });
   const container = document.getElementById('gsiButtonContainer');
   if (container) {
-    // Google's GSI library can lose the race between initialize() and renderButton()
-    // when both are called synchronously — it fails silently (only a console
-    // warning: "Failed to render button before calling initialize()"). A short
-    // delay avoids the race.
     setTimeout(() => {
+      if (gsiRendered) return;
+      gsiRendered = true;
       google.accounts.id.renderButton(container, { theme: 'filled_black', size: 'large', shape: 'rectangular', width: 300, text: 'continue_with' });
     }, 300);
   }
 }
+document.addEventListener('DOMContentLoaded', () => initGoogleSignIn());
 function handleGoogleCredential(response) {
   const credential = firebase.auth.GoogleAuthProvider.credential(response.credential);
   auth.signInWithCredential(credential).catch(e => {
