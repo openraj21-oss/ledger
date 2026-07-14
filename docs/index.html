@@ -76,6 +76,14 @@
   .journalrow{padding:10px 0;border-bottom:1px solid var(--hair);}
   .journalts{font-family:var(--font-mono);font-size:11px;color:var(--muted);}
   .journalnote{font-size:13px;margin-top:3px;}
+  .calwrap{overflow-x:auto;padding-bottom:2px;}
+  .calmonths{display:flex;gap:3px;margin-bottom:4px;}
+  .calmonths span{width:11px;font-family:var(--font-mono);font-size:9px;color:var(--muted);overflow:visible;white-space:nowrap;}
+  .calgrid{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,11px);grid-auto-columns:11px;gap:3px;width:max-content;}
+  .calcell{width:11px;height:11px;border-radius:2px;background:var(--hair);}
+  .calcell[data-level="1"]{background:#B7D4CE;}
+  .calcell[data-level="2"]{background:#6FA99B;}
+  .calcell[data-level="3"]{background:var(--accent);}
 </style>
 </head>
 <body>
@@ -112,6 +120,10 @@
 
   <div class="panel" id="panel-analytics">
     <div class="statgrid" id="statGrid"></div>
+    <div class="chartblock">
+      <div class="charttitle">Activity</div>
+      <div id="overallCalendar"></div>
+    </div>
     <div class="chartblock">
       <div class="charttitle">Reps per goal</div>
       <div style="position:relative;height:220px;"><canvas id="repsChart" role="img" aria-label="Bar chart of reps logged per active goal"></canvas></div>
@@ -157,6 +169,11 @@
     <div class="chartblock">
       <div class="charttitle">Progress toward graduation</div>
       <div class="mosaic" id="detailMosaic"></div>
+    </div>
+
+    <div class="chartblock">
+      <div class="charttitle">Activity</div>
+      <div id="detailCalendar"></div>
     </div>
 
     <div class="addrow">
@@ -459,6 +476,8 @@ function renderAnalytics() {
     <div class="stat"><div class="n">${allLogs.length}</div><div class="l">total reps logged</div></div>
   `;
 
+  renderCalendarInto('overallCalendar', state.goals.flatMap(g => g.logs), 20);
+
   const activeGoals = state.goals.filter(g => g.status === 'active');
   const repsCtx = document.getElementById('repsChart');
   if (charts.reps) charts.reps.destroy();
@@ -491,6 +510,63 @@ function renderAnalytics() {
     options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } },
       scales: { x: { ticks: { color: '#6B7076', maxTicksLimit: 6 }, grid: { display: false } }, y: { beginAtZero: true, ticks: { color: '#6B7076', precision: 0 }, grid: { color: '#E4E2DC' } } } }
   });
+}
+
+// ---- Calendar heatmap (GitHub-contributions style), reused for the
+// overall Analytics view and each goal's detail page. ----
+function buildDayCounts(logsFlat) {
+  const map = {};
+  logsFlat.forEach(l => {
+    const key = new Date(logTs(l)).toDateString();
+    map[key] = (map[key] || 0) + 1;
+  });
+  return map;
+}
+function renderCalendarInto(containerId, logsFlat, weeks) {
+  weeks = weeks || 20;
+  const counts = buildDayCounts(logsFlat);
+  const today = new Date(); today.setHours(0, 0, 0, 0);
+  const gridEnd = new Date(today); gridEnd.setDate(today.getDate() + (6 - today.getDay()));
+  const totalDays = weeks * 7;
+  const gridStart = new Date(gridEnd); gridStart.setDate(gridEnd.getDate() - totalDays + 1);
+  const maxCount = Math.max(1, ...Object.values(counts));
+
+  const container = document.getElementById(containerId);
+  if (!container) return;
+  container.innerHTML = '';
+  if (!logsFlat.length) { container.innerHTML = '<div class="empty">No activity yet.</div>'; return; }
+
+  const monthsRow = document.createElement('div');
+  monthsRow.className = 'calmonths';
+  let lastMonth = null;
+  for (let w = 0; w < weeks; w++) {
+    const weekStart = new Date(gridStart); weekStart.setDate(gridStart.getDate() + w * 7);
+    const label = document.createElement('span');
+    if (weekStart.getMonth() !== lastMonth) {
+      label.textContent = weekStart.toLocaleDateString(undefined, { month: 'short' });
+      lastMonth = weekStart.getMonth();
+    }
+    monthsRow.appendChild(label);
+  }
+
+  const grid = document.createElement('div');
+  grid.className = 'calgrid';
+  for (let d = 0; d < totalDays; d++) {
+    const day = new Date(gridStart); day.setDate(gridStart.getDate() + d);
+    const c = day > today ? 0 : (counts[day.toDateString()] || 0);
+    const cell = document.createElement('div');
+    cell.className = 'calcell';
+    const level = c === 0 ? 0 : (c >= maxCount ? 3 : (c > maxCount / 2 ? 2 : 1));
+    cell.dataset.level = level;
+    if (day <= today) cell.title = day.toLocaleDateString() + (c ? `: ${c} rep${c > 1 ? 's' : ''}` : ': no reps');
+    grid.appendChild(cell);
+  }
+
+  const scroller = document.createElement('div');
+  scroller.className = 'calwrap';
+  scroller.appendChild(grid);
+  container.appendChild(monthsRow);
+  container.appendChild(scroller);
 }
 
 // ---- Per-goal detail page ----
@@ -550,6 +626,8 @@ function renderDetail() {
     cell.className = 'cell' + (i < g.logs.length ? ' filled' : '');
     mosaic.appendChild(cell);
   }
+
+  renderCalendarInto('detailCalendar', g.logs, 20);
 
   const journal = document.getElementById('detailJournal');
   journal.innerHTML = g.logs.length ? '' : '<div class="empty">No reps logged yet.</div>';
