@@ -39,12 +39,12 @@
   button.primary:hover{opacity:0.85;}
   button.ghost{font-family:var(--font-body);font-size:12px;padding:6px 12px;border-radius:6px;border:1px solid var(--hair);background:none;color:var(--ink);cursor:pointer;}
   button.ghost:hover{border-color:var(--ink);}
-  .goal{display:flex;align-items:center;gap:10px;padding:14px 0;border-bottom:1px solid var(--hair);}
+  .goal{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--hair);}
   .stripe{width:3px;align-self:stretch;border-radius:2px;flex-shrink:0;}
   .gname{font-weight:500;font-size:15px;margin:0 0 3px;}
   .gmeta{font-family:var(--font-mono);font-size:11px;color:var(--muted);}
   .gmeta .neg{color:var(--neglect);}
-  .gbody{flex:1;min-width:0;}
+  .gbody{flex:1;min-width:0;cursor:pointer;}
   .progress{height:4px;background:var(--hair);border-radius:2px;margin-top:6px;overflow:hidden;width:140px;}
   .progress > div{height:100%;background:var(--accent);}
   .empty{color:var(--muted);font-size:13px;padding:2rem 0;text-align:center;}
@@ -54,19 +54,22 @@
   .stat .l{font-size:11px;color:var(--muted);margin-top:2px;}
   .chartblock{margin-bottom:2rem;}
   .charttitle{font-size:13px;font-weight:500;margin-bottom:10px;}
-  .habitrow{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--hair);gap:10px;}
-  .habitname{font-weight:500;font-size:14px;}
-  .habitmeta{font-family:var(--font-mono);font-size:11px;color:var(--habit);}
+  .habitrow{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--hair);gap:14px;}
+  .habitname{font-weight:500;font-size:14px;cursor:pointer;flex:1;min-width:0;}
+  .habitmeta{font-family:var(--font-mono);font-size:11px;color:var(--habit);white-space:nowrap;}
   .settingsrow{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--hair);}
   .settingsrow label{font-size:13px;}
   .settingsrow input[type=number]{width:70px;font-family:var(--font-mono);}
-  .iconbtn{width:28px;height:28px;border-radius:6px;border:1px solid var(--hair);background:none;cursor:pointer;color:var(--muted);font-size:14px;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;}
-  .iconbtn:hover{border-color:var(--ink);color:var(--ink);}
-  .stepper{display:flex;align-items:center;gap:6px;}
-  .stepper .count{font-family:var(--font-mono);font-size:13px;min-width:18px;text-align:center;}
-  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:8px;font-size:13px;display:flex;align-items:center;gap:16px;box-shadow:0 4px 16px rgba(0,0,0,0.2);opacity:0;pointer-events:none;transition:opacity .2s ease, transform .2s ease;z-index:100;max-width:90vw;}
-  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto;}
-  .toast button{background:none;border:none;color:#9FD8C7;font-weight:500;font-size:13px;cursor:pointer;text-decoration:underline;padding:0;flex-shrink:0;}
+  .rowactions{display:flex;align-items:center;gap:6px;flex-shrink:0;}
+  .iconbtn{padding:6px 9px;font-size:13px;line-height:1;}
+  .detailtop{display:flex;align-items:center;justify-content:space-between;margin-bottom:6px;}
+  .detailname{font-family:var(--font-display);font-weight:600;font-size:20px;margin:10px 0 2px;letter-spacing:-0.01em;}
+  .mosaic{display:flex;flex-wrap:wrap;gap:4px;max-width:294px;margin-top:2px;}
+  .mosaic .cell{width:28px;height:28px;border-radius:4px;background:var(--hair);}
+  .mosaic .cell.filled{background:var(--accent);}
+  .journalrow{padding:10px 0;border-bottom:1px solid var(--hair);}
+  .journalts{font-family:var(--font-mono);font-size:11px;color:var(--muted);}
+  .journalnote{font-size:13px;margin-top:3px;}
 </style>
 </head>
 <body>
@@ -82,7 +85,7 @@
   <h1>Ledger</h1>
   <p class="sub">Goals ordered by neglect. Log a rep, watch it graduate.</p>
 
-  <div class="tabs">
+  <div class="tabs" id="mainTabs">
     <button class="tab active" data-tab="active">Active</button>
     <button class="tab" data-tab="habits">Habits</button>
     <button class="tab" data-tab="analytics">Analytics</button>
@@ -131,11 +134,35 @@
       <button class="ghost" id="signOutBtn">Sign out</button>
     </div>
   </div>
-</div>
 
-<div class="toast" id="undoToast">
-  <span id="undoToastMsg"></span>
-  <button id="undoToastBtn">Undo</button>
+  <div class="panel" id="panel-detail">
+    <div class="detailtop">
+      <button class="ghost" id="backBtn">← Back</button>
+      <div class="rowactions">
+        <button class="ghost iconbtn" id="detailRenameBtn" title="Rename">✎</button>
+        <button class="ghost iconbtn" id="detailDeleteBtn" title="Delete">✕</button>
+      </div>
+    </div>
+    <p class="detailname" id="detailName"></p>
+    <p class="gmeta" id="detailMeta"></p>
+
+    <div class="statgrid" id="detailStats" style="margin-top:1.25rem;"></div>
+
+    <div class="chartblock">
+      <div class="charttitle">Progress toward graduation</div>
+      <div class="mosaic" id="detailMosaic"></div>
+    </div>
+
+    <div class="addrow">
+      <input type="text" id="detailNoteInput" placeholder="Note for this rep (optional)…" />
+      <button class="primary" id="detailLogBtn">Log rep</button>
+    </div>
+
+    <div class="chartblock">
+      <div class="charttitle">Journal</div>
+      <div id="detailJournal"></div>
+    </div>
+  </div>
 </div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
@@ -163,8 +190,7 @@ let currentUid = null;
 
 let state = { goals: [], threshold: 21 };
 let charts = {};
-let editing = new Set(); // goal ids currently showing the rep stepper
-let undoTimer = null;
+let currentDetailId = null;
 
 async function load() {
   if (!currentUid) return;
@@ -242,8 +268,13 @@ function fmtNeglect(ts) {
   if (d < 1) return 'today';
   return Math.floor(d) + 'd ago';
 }
+// Individual log entries are either a bare timestamp (legacy / no note) or
+// { ts, note } once a note is attached. These two helpers normalize either
+// shape so the rest of the app never has to branch on it.
+function logTs(log) { return typeof log === 'number' ? log : log.ts; }
+function logNote(log) { return (log && typeof log === 'object' && log.note) ? log.note : ''; }
 function lastLog(goal) {
-  return goal.logs.length ? goal.logs[goal.logs.length - 1] : null;
+  return goal.logs.length ? logTs(goal.logs[goal.logs.length - 1]) : null;
 }
 
 function addGoal(name) {
@@ -251,62 +282,33 @@ function addGoal(name) {
   state.goals.push({ id: Date.now() + Math.random().toString(36).slice(2), name: name.trim(), createdAt: Date.now(), status: 'active', graduatedAt: null, logs: [] });
   save(); render();
 }
-
-function logRep(id) {
+function logRep(id, note) {
   const g = state.goals.find(x => x.id === id);
   if (!g) return;
-  const ts = Date.now();
-  g.logs.push(ts);
-  let graduated = false;
+  g.logs.push(note ? { ts: Date.now(), note } : Date.now());
   if (g.logs.length >= state.threshold && g.status === 'active') {
-    g.status = 'habit'; g.graduatedAt = Date.now(); graduated = true;
+    g.status = 'habit'; g.graduatedAt = Date.now();
   }
   save(); render();
-  showUndoToast('Logged "' + g.name + '"', () => undoLastLog(id, ts, graduated));
 }
-
-// Undo: reverses the single most recent logRep() call, within the toast window.
-function undoLastLog(id, ts, wasGraduated) {
+function renameGoal(id) {
   const g = state.goals.find(x => x.id === id);
   if (!g) return;
-  const idx = g.logs.lastIndexOf(ts);
-  if (idx !== -1) g.logs.splice(idx, 1);
-  if (wasGraduated) { g.status = 'active'; g.graduatedAt = null; }
+  const next = prompt('Rename goal', g.name);
+  if (next === null) return;
+  const trimmed = next.trim();
+  if (!trimmed) return;
+  g.name = trimmed;
   save(); render();
 }
-
-function showUndoToast(message, onUndo) {
-  clearTimeout(undoTimer);
-  const toast = document.getElementById('undoToast');
-  document.getElementById('undoToastMsg').textContent = message;
-  const btn = document.getElementById('undoToastBtn');
-  btn.onclick = () => { onUndo(); hideUndoToast(); };
-  toast.classList.add('show');
-  undoTimer = setTimeout(hideUndoToast, 5000);
-}
-function hideUndoToast() {
-  document.getElementById('undoToast').classList.remove('show');
-  clearTimeout(undoTimer);
-}
-
-// Edit mode: lets you correct old mistakes (wrong goal logged days ago, etc.)
-// by stepping the rep count up or down directly on the card.
-function toggleEdit(id) {
-  if (editing.has(id)) editing.delete(id); else editing.add(id);
-  render();
-}
-function adjustRep(id, delta) {
+function deleteGoal(id) {
   const g = state.goals.find(x => x.id === id);
   if (!g) return;
-  if (delta > 0) {
-    g.logs.push(Date.now());
-    if (g.logs.length >= state.threshold && g.status === 'active') { g.status = 'habit'; g.graduatedAt = Date.now(); }
-  } else {
-    if (!g.logs.length) return;
-    g.logs.pop();
-    if (g.status === 'habit' && g.logs.length < state.threshold) { g.status = 'active'; g.graduatedAt = null; }
-  }
-  save(); render();
+  if (!confirm(`Delete "${g.name}"? This can't be undone.`)) return;
+  state.goals = state.goals.filter(x => x.id !== id);
+  save();
+  if (currentDetailId === id) closeDetail();
+  else render();
 }
 
 function render() {
@@ -320,27 +322,20 @@ function render() {
   active.forEach(g => {
     const d = daysSince(lastLog(g));
     const intensity = Math.min(1, (isFinite(d) ? d : 30) / maxNeg);
-    const isEditing = editing.has(g.id);
     const row = document.createElement('div');
     row.className = 'goal';
     row.innerHTML = `
       <div class="stripe" style="background:var(--neglect);opacity:${(0.25 + intensity * 0.75).toFixed(2)}"></div>
-      <div class="gbody">
+      <div class="gbody" onclick="openDetail('${g.id}')">
         <p class="gname">${escapeHtml(g.name)}</p>
         <p class="gmeta"><span class="neg">${fmtNeglect(lastLog(g))}</span> · ${g.logs.length}/${state.threshold} reps</p>
         <div class="progress"><div style="width:${Math.min(100, g.logs.length / state.threshold * 100)}%"></div></div>
       </div>
-      ${isEditing ? `
-        <div class="stepper">
-          <button class="iconbtn" title="Remove a rep" onclick="adjustRep('${g.id}',-1)">−</button>
-          <span class="count">${g.logs.length}</span>
-          <button class="iconbtn" title="Add a rep" onclick="adjustRep('${g.id}',1)">+</button>
-        </div>
-        <button class="ghost" onclick="toggleEdit('${g.id}')">Done</button>
-      ` : `
-        <button class="iconbtn" title="Edit reps" onclick="toggleEdit('${g.id}')">✎</button>
-        <button class="primary" onclick="logRep('${g.id}')">Log</button>
-      `}
+      <div class="rowactions">
+        <button class="primary" onclick="event.stopPropagation(); logRep('${g.id}')">Log</button>
+        <button class="ghost iconbtn" title="Rename" onclick="event.stopPropagation(); renameGoal('${g.id}')">✎</button>
+        <button class="ghost iconbtn" title="Delete" onclick="event.stopPropagation(); deleteGoal('${g.id}')">✕</button>
+      </div>
     `;
     activeList.appendChild(row);
   });
@@ -348,34 +343,28 @@ function render() {
   const habitsList = document.getElementById('habitsList');
   habitsList.innerHTML = habits.length ? '' : '<div class="empty">No habits formed yet — they will appear here once a goal hits its rep threshold.</div>';
   habits.forEach(g => {
-    const isEditing = editing.has(g.id);
     const row = document.createElement('div');
     row.className = 'habitrow';
     row.innerHTML = `
-      <span class="habitname">${escapeHtml(g.name)}</span>
-      ${isEditing ? `
-        <div class="stepper">
-          <button class="iconbtn" title="Remove a rep" onclick="adjustRep('${g.id}',-1)">−</button>
-          <span class="count">${g.logs.length}</span>
-          <button class="iconbtn" title="Add a rep" onclick="adjustRep('${g.id}',1)">+</button>
-        </div>
-        <button class="ghost" onclick="toggleEdit('${g.id}')">Done</button>
-      ` : `
-        <span class="habitmeta">${g.logs.length} reps · graduated ${new Date(g.graduatedAt).toLocaleDateString()}</span>
-        <button class="iconbtn" title="Edit reps" onclick="toggleEdit('${g.id}')">✎</button>
-      `}
+      <span class="habitname" onclick="openDetail('${g.id}')">${escapeHtml(g.name)}</span>
+      <span class="habitmeta">${g.logs.length} reps · graduated ${new Date(g.graduatedAt).toLocaleDateString()}</span>
+      <div class="rowactions">
+        <button class="ghost iconbtn" title="Rename" onclick="renameGoal('${g.id}')">✎</button>
+        <button class="ghost iconbtn" title="Delete" onclick="deleteGoal('${g.id}')">✕</button>
+      </div>
     `;
     habitsList.appendChild(row);
   });
 
   document.getElementById('thresholdInput').value = state.threshold;
   renderAnalytics();
+  if (currentDetailId) renderDetail();
 }
 
 function escapeHtml(s) { const d = document.createElement('div'); d.textContent = s; return d.innerHTML; }
 
 function renderAnalytics() {
-  const allLogs = state.goals.flatMap(g => g.logs);
+  const allLogs = state.goals.flatMap(g => g.logs).map(logTs);
   const habitsCount = state.goals.filter(g => g.status === 'habit').length;
   const activeCount = state.goals.filter(g => g.status === 'active').length;
   document.getElementById('statGrid').innerHTML = `
@@ -418,6 +407,87 @@ function renderAnalytics() {
   });
 }
 
+// ---- Per-goal detail page ----
+function currentStreak(g) {
+  const days = new Set(g.logs.map(l => new Date(logTs(l)).toDateString()));
+  let streak = 0;
+  const cursor = new Date();
+  if (!days.has(cursor.toDateString())) cursor.setDate(cursor.getDate() - 1);
+  while (days.has(cursor.toDateString())) {
+    streak++;
+    cursor.setDate(cursor.getDate() - 1);
+  }
+  return streak;
+}
+
+function openDetail(id) {
+  currentDetailId = id;
+  document.getElementById('mainTabs').style.display = 'none';
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-detail').classList.add('active');
+  renderDetail();
+}
+function closeDetail() {
+  currentDetailId = null;
+  document.getElementById('mainTabs').style.display = 'flex';
+  document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
+  document.getElementById('panel-detail').classList.remove('active');
+  document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
+  document.querySelector('.tab[data-tab="active"]').classList.add('active');
+  document.getElementById('panel-active').classList.add('active');
+  render();
+}
+document.getElementById('backBtn').onclick = closeDetail;
+document.getElementById('detailRenameBtn').onclick = () => { if (currentDetailId) renameGoal(currentDetailId); };
+document.getElementById('detailDeleteBtn').onclick = () => { if (currentDetailId) deleteGoal(currentDetailId); };
+
+function renderDetail() {
+  const g = state.goals.find(x => x.id === currentDetailId);
+  if (!g) { closeDetail(); return; }
+
+  document.getElementById('detailName').textContent = g.name;
+  document.getElementById('detailMeta').innerHTML =
+    `<span class="${g.status === 'habit' ? '' : 'neg'}">${fmtNeglect(lastLog(g))}</span> · ${g.logs.length}/${state.threshold} reps` +
+    (g.status === 'habit' ? ` · graduated ${new Date(g.graduatedAt).toLocaleDateString()}` : '');
+
+  document.getElementById('detailStats').innerHTML = `
+    <div class="stat"><div class="n">${g.logs.length}</div><div class="l">total reps</div></div>
+    <div class="stat"><div class="n">${currentStreak(g)}</div><div class="l">day streak</div></div>
+    <div class="stat"><div class="n">${Math.max(0, state.threshold - g.logs.length)}</div><div class="l">reps to go</div></div>
+  `;
+
+  const mosaic = document.getElementById('detailMosaic');
+  mosaic.innerHTML = '';
+  const total = Math.max(state.threshold, g.logs.length);
+  for (let i = 0; i < total; i++) {
+    const cell = document.createElement('div');
+    cell.className = 'cell' + (i < g.logs.length ? ' filled' : '');
+    mosaic.appendChild(cell);
+  }
+
+  const journal = document.getElementById('detailJournal');
+  journal.innerHTML = g.logs.length ? '' : '<div class="empty">No reps logged yet.</div>';
+  [...g.logs].reverse().forEach(log => {
+    const note = logNote(log);
+    const row = document.createElement('div');
+    row.className = 'journalrow';
+    row.innerHTML = `<div class="journalts">${new Date(logTs(log)).toLocaleString()}</div>${note ? `<div class="journalnote">${escapeHtml(note)}</div>` : ''}`;
+    journal.appendChild(row);
+  });
+
+  const logBtn = document.getElementById('detailLogBtn');
+  logBtn.disabled = g.status === 'habit';
+  logBtn.textContent = g.status === 'habit' ? 'Graduated' : 'Log rep';
+}
+
+document.getElementById('detailLogBtn').onclick = () => {
+  if (!currentDetailId || document.getElementById('detailLogBtn').disabled) return;
+  const noteInput = document.getElementById('detailNoteInput');
+  logRep(currentDetailId, noteInput.value.trim());
+  noteInput.value = '';
+};
+
 document.getElementById('addGoalBtn').onclick = () => {
   const input = document.getElementById('newGoalInput');
   addGoal(input.value); input.value = '';
@@ -433,6 +503,7 @@ document.getElementById('resetBtn').onclick = () => {
 };
 document.querySelectorAll('.tab').forEach(btn => {
   btn.onclick = () => {
+    currentDetailId = null;
     document.querySelectorAll('.tab').forEach(b => b.classList.remove('active'));
     document.querySelectorAll('.panel').forEach(p => p.classList.remove('active'));
     btn.classList.add('active');
