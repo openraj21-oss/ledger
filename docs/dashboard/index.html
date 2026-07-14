@@ -1,0 +1,32 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Ledger — Financial Dashboard</title>
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+<div class="wrap">
+<header class="topbar">
+<h1>Net Worth</h1>
+<div class="asof" id="asOf">—</div>
+</header>
+<section class="hero">
+<div class="hero-number" id="netWorthTotal">€0</div>
+<div class="hero-sub" id="netWorthDelta"></div>
+</section>
+<section class="accounts" id="accountGrid">
+</section>
+<section class="breakdown">
+<h2>By direction</h2>
+<div class="bars" id="directionBars"></div>
+</section>
+<footer class="status-footer">
+<span id="dataSourceNote">Showing sample data — no live bank connection yet.</span>
+</footer>
+</div>
+<script src="data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>
