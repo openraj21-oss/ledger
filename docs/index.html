@@ -39,7 +39,7 @@
   button.primary:hover{opacity:0.85;}
   button.ghost{font-family:var(--font-body);font-size:12px;padding:6px 12px;border-radius:6px;border:1px solid var(--hair);background:none;color:var(--ink);cursor:pointer;}
   button.ghost:hover{border-color:var(--ink);}
-  .goal{display:flex;align-items:center;gap:14px;padding:14px 0;border-bottom:1px solid var(--hair);}
+  .goal{display:flex;align-items:center;gap:10px;padding:14px 0;border-bottom:1px solid var(--hair);}
   .stripe{width:3px;align-self:stretch;border-radius:2px;flex-shrink:0;}
   .gname{font-weight:500;font-size:15px;margin:0 0 3px;}
   .gmeta{font-family:var(--font-mono);font-size:11px;color:var(--muted);}
@@ -54,12 +54,19 @@
   .stat .l{font-size:11px;color:var(--muted);margin-top:2px;}
   .chartblock{margin-bottom:2rem;}
   .charttitle{font-size:13px;font-weight:500;margin-bottom:10px;}
-  .habitrow{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--hair);}
+  .habitrow{display:flex;justify-content:space-between;align-items:center;padding:12px 0;border-bottom:1px solid var(--hair);gap:10px;}
   .habitname{font-weight:500;font-size:14px;}
   .habitmeta{font-family:var(--font-mono);font-size:11px;color:var(--habit);}
   .settingsrow{display:flex;justify-content:space-between;align-items:center;padding:14px 0;border-bottom:1px solid var(--hair);}
   .settingsrow label{font-size:13px;}
   .settingsrow input[type=number]{width:70px;font-family:var(--font-mono);}
+  .iconbtn{width:28px;height:28px;border-radius:6px;border:1px solid var(--hair);background:none;cursor:pointer;color:var(--muted);font-size:14px;flex-shrink:0;display:flex;align-items:center;justify-content:center;padding:0;line-height:1;}
+  .iconbtn:hover{border-color:var(--ink);color:var(--ink);}
+  .stepper{display:flex;align-items:center;gap:6px;}
+  .stepper .count{font-family:var(--font-mono);font-size:13px;min-width:18px;text-align:center;}
+  .toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%) translateY(20px);background:var(--ink);color:var(--paper);padding:10px 16px;border-radius:8px;font-size:13px;display:flex;align-items:center;gap:16px;box-shadow:0 4px 16px rgba(0,0,0,0.2);opacity:0;pointer-events:none;transition:opacity .2s ease, transform .2s ease;z-index:100;max-width:90vw;}
+  .toast.show{opacity:1;transform:translateX(-50%) translateY(0);pointer-events:auto;}
+  .toast button{background:none;border:none;color:#9FD8C7;font-weight:500;font-size:13px;cursor:pointer;text-decoration:underline;padding:0;flex-shrink:0;}
 </style>
 </head>
 <body>
@@ -126,6 +133,11 @@
   </div>
 </div>
 
+<div class="toast" id="undoToast">
+  <span id="undoToastMsg"></span>
+  <button id="undoToastBtn">Undo</button>
+</div>
+
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.12.2/firebase-auth-compat.js"></script>
@@ -151,6 +163,8 @@ let currentUid = null;
 
 let state = { goals: [], threshold: 21 };
 let charts = {};
+let editing = new Set(); // goal ids currently showing the rep stepper
+let undoTimer = null;
 
 async function load() {
   if (!currentUid) return;
@@ -237,12 +251,60 @@ function addGoal(name) {
   state.goals.push({ id: Date.now() + Math.random().toString(36).slice(2), name: name.trim(), createdAt: Date.now(), status: 'active', graduatedAt: null, logs: [] });
   save(); render();
 }
+
 function logRep(id) {
   const g = state.goals.find(x => x.id === id);
   if (!g) return;
-  g.logs.push(Date.now());
+  const ts = Date.now();
+  g.logs.push(ts);
+  let graduated = false;
   if (g.logs.length >= state.threshold && g.status === 'active') {
-    g.status = 'habit'; g.graduatedAt = Date.now();
+    g.status = 'habit'; g.graduatedAt = Date.now(); graduated = true;
+  }
+  save(); render();
+  showUndoToast('Logged "' + g.name + '"', () => undoLastLog(id, ts, graduated));
+}
+
+// Undo: reverses the single most recent logRep() call, within the toast window.
+function undoLastLog(id, ts, wasGraduated) {
+  const g = state.goals.find(x => x.id === id);
+  if (!g) return;
+  const idx = g.logs.lastIndexOf(ts);
+  if (idx !== -1) g.logs.splice(idx, 1);
+  if (wasGraduated) { g.status = 'active'; g.graduatedAt = null; }
+  save(); render();
+}
+
+function showUndoToast(message, onUndo) {
+  clearTimeout(undoTimer);
+  const toast = document.getElementById('undoToast');
+  document.getElementById('undoToastMsg').textContent = message;
+  const btn = document.getElementById('undoToastBtn');
+  btn.onclick = () => { onUndo(); hideUndoToast(); };
+  toast.classList.add('show');
+  undoTimer = setTimeout(hideUndoToast, 5000);
+}
+function hideUndoToast() {
+  document.getElementById('undoToast').classList.remove('show');
+  clearTimeout(undoTimer);
+}
+
+// Edit mode: lets you correct old mistakes (wrong goal logged days ago, etc.)
+// by stepping the rep count up or down directly on the card.
+function toggleEdit(id) {
+  if (editing.has(id)) editing.delete(id); else editing.add(id);
+  render();
+}
+function adjustRep(id, delta) {
+  const g = state.goals.find(x => x.id === id);
+  if (!g) return;
+  if (delta > 0) {
+    g.logs.push(Date.now());
+    if (g.logs.length >= state.threshold && g.status === 'active') { g.status = 'habit'; g.graduatedAt = Date.now(); }
+  } else {
+    if (!g.logs.length) return;
+    g.logs.pop();
+    if (g.status === 'habit' && g.logs.length < state.threshold) { g.status = 'active'; g.graduatedAt = null; }
   }
   save(); render();
 }
@@ -258,6 +320,7 @@ function render() {
   active.forEach(g => {
     const d = daysSince(lastLog(g));
     const intensity = Math.min(1, (isFinite(d) ? d : 30) / maxNeg);
+    const isEditing = editing.has(g.id);
     const row = document.createElement('div');
     row.className = 'goal';
     row.innerHTML = `
@@ -267,7 +330,17 @@ function render() {
         <p class="gmeta"><span class="neg">${fmtNeglect(lastLog(g))}</span> · ${g.logs.length}/${state.threshold} reps</p>
         <div class="progress"><div style="width:${Math.min(100, g.logs.length / state.threshold * 100)}%"></div></div>
       </div>
-      <button class="primary" onclick="logRep('${g.id}')">Log</button>
+      ${isEditing ? `
+        <div class="stepper">
+          <button class="iconbtn" title="Remove a rep" onclick="adjustRep('${g.id}',-1)">−</button>
+          <span class="count">${g.logs.length}</span>
+          <button class="iconbtn" title="Add a rep" onclick="adjustRep('${g.id}',1)">+</button>
+        </div>
+        <button class="ghost" onclick="toggleEdit('${g.id}')">Done</button>
+      ` : `
+        <button class="iconbtn" title="Edit reps" onclick="toggleEdit('${g.id}')">✎</button>
+        <button class="primary" onclick="logRep('${g.id}')">Log</button>
+      `}
     `;
     activeList.appendChild(row);
   });
@@ -275,9 +348,23 @@ function render() {
   const habitsList = document.getElementById('habitsList');
   habitsList.innerHTML = habits.length ? '' : '<div class="empty">No habits formed yet — they will appear here once a goal hits its rep threshold.</div>';
   habits.forEach(g => {
+    const isEditing = editing.has(g.id);
     const row = document.createElement('div');
     row.className = 'habitrow';
-    row.innerHTML = `<span class="habitname">${escapeHtml(g.name)}</span><span class="habitmeta">${g.logs.length} reps · graduated ${new Date(g.graduatedAt).toLocaleDateString()}</span>`;
+    row.innerHTML = `
+      <span class="habitname">${escapeHtml(g.name)}</span>
+      ${isEditing ? `
+        <div class="stepper">
+          <button class="iconbtn" title="Remove a rep" onclick="adjustRep('${g.id}',-1)">−</button>
+          <span class="count">${g.logs.length}</span>
+          <button class="iconbtn" title="Add a rep" onclick="adjustRep('${g.id}',1)">+</button>
+        </div>
+        <button class="ghost" onclick="toggleEdit('${g.id}')">Done</button>
+      ` : `
+        <span class="habitmeta">${g.logs.length} reps · graduated ${new Date(g.graduatedAt).toLocaleDateString()}</span>
+        <button class="iconbtn" title="Edit reps" onclick="toggleEdit('${g.id}')">✎</button>
+      `}
+    `;
     habitsList.appendChild(row);
   });
 
