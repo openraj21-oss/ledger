@@ -102,10 +102,32 @@ body {
   color: var(--up);
 }
 
+.account-card .badge.stale {
+  background: rgba(255, 193, 7, 0.15);
+  color: #ffc107;
+}
+
+.account-card .badge.error {
+  background: rgba(255, 103, 103, 0.15);
+  color: var(--down);
+}
+
 .account-card .balance {
   font-size: 26px;
   font-weight: 600;
   margin-top: 8px;
+}
+
+.account-card .balance.muted {
+  color: var(--muted);
+  font-size: 20px;
+}
+
+.account-card .account-note {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 6px;
+  line-height: 1.4;
 }
 
 .breakdown h2 {
@@ -129,6 +151,7 @@ body {
 }
 
 .bar-label .amt { color: var(--muted); }
+.bar-label .amt.muted { font-style: italic; }
 
 .bar-track {
   height: 8px;
@@ -149,4 +172,119 @@ body {
   color: var(--muted);
   border-top: 1px solid var(--panel-border);
   padding-top: 16px;
+}
+
+.signed-in-row {
+  margin-top: 10px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+/* --- auth screen --- */
+
+.auth-screen {
+  max-width: 340px;
+  margin: 4rem auto;
+  text-align: center;
+  padding: 0 1rem;
+}
+
+.auth-screen h1 {
+  font-size: 22px;
+  margin-bottom: 8px;
+}
+
+.auth-screen .sub {
+  color: var(--muted);
+  font-size: 13px;
+  margin: 0 0 1rem;
+}
+
+.gsi-container {
+  display: flex;
+  justify-content: center;
+  margin-top: 8px;
+}
+
+.auth-error {
+  color: var(--down);
+  font-size: 12px;
+  margin-top: 12px;
+}
+
+/* --- manual balance edit panel --- */
+
+.edit-panel {
+  background: var(--panel);
+  border: 1px solid var(--panel-border);
+  border-radius: var(--radius);
+  padding: 18px;
+  margin-bottom: 24px;
+}
+
+.edit-panel h2 {
+  font-size: 13px;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  color: var(--muted);
+  margin: 0 0 14px;
+}
+
+.edit-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.edit-row label {
+  font-size: 13px;
+  color: var(--text);
+}
+
+.edit-row input {
+  width: 120px;
+  font-family: inherit;
+  font-size: 13px;
+  padding: 6px 8px;
+  border-radius: 6px;
+  border: 1px solid var(--panel-border);
+  background: var(--bg);
+  color: var(--text);
+}
+
+button.primary {
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  padding: 8px 16px;
+  border-radius: 8px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  cursor: pointer;
+}
+
+button.primary:hover { opacity: 0.85; }
+
+button.ghost {
+  font-family: inherit;
+  font-size: 12px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  border: 1px solid var(--panel-border);
+  background: none;
+  color: var(--text);
+  cursor: pointer;
+}
+
+button.ghost:hover { border-color: var(--muted); }
+
+.edit-status {
+  font-size: 12px;
+  color: var(--muted);
+  margin-left: 10px;
 }
