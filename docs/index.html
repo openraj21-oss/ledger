@@ -76,14 +76,23 @@
   .journalrow{padding:10px 0;border-bottom:1px solid var(--hair);}
   .journalts{font-family:var(--font-mono);font-size:11px;color:var(--muted);}
   .journalnote{font-size:13px;margin-top:3px;}
-  .calwrap{overflow-x:auto;padding-bottom:2px;}
-  .calmonths{display:flex;gap:3px;margin-bottom:4px;}
-  .calmonths span{width:11px;font-family:var(--font-mono);font-size:9px;color:var(--muted);overflow:visible;white-space:nowrap;}
-  .calgrid{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,11px);grid-auto-columns:11px;gap:3px;width:max-content;}
-  .calcell{width:11px;height:11px;border-radius:2px;background:var(--hair);}
-  .calcell[data-level="1"]{background:#B7D4CE;}
-  .calcell[data-level="2"]{background:#6FA99B;}
+  .calmonths{display:flex;gap:3px;margin-bottom:4px;margin-left:26px;}
+  .calmonths span{width:12px;font-family:var(--font-mono);font-size:9px;color:var(--muted);overflow:visible;white-space:nowrap;}
+  .calwrap{overflow-x:auto;padding-bottom:2px;display:flex;gap:6px;}
+  .caldays{display:flex;flex-direction:column;gap:3px;flex-shrink:0;width:20px;}
+  .caldays span{height:12px;line-height:12px;font-family:var(--font-mono);font-size:9px;color:var(--muted);}
+  .calgrid{display:grid;grid-auto-flow:column;grid-template-rows:repeat(7,12px);grid-auto-columns:12px;gap:3px;width:max-content;}
+  .calcell{width:12px;height:12px;border-radius:3px;background:var(--hair);cursor:pointer;}
+  .calcell[data-level="1"]{background:#A9D2C8;}
+  .calcell[data-level="2"]{background:#5B9689;}
   .calcell[data-level="3"]{background:var(--accent);}
+  .caltooltip{position:fixed;display:none;background:var(--ink);color:var(--paper);padding:8px 10px;border-radius:8px;font-size:12px;line-height:1.45;box-shadow:0 4px 16px rgba(0,0,0,0.25);z-index:200;max-width:220px;pointer-events:none;opacity:0;transition:opacity .1s ease;}
+  .caltooltip.show{opacity:1;}
+  .caltooltip-date{font-family:var(--font-mono);font-size:11px;color:#9FD8C7;margin-bottom:3px;}
+  .caltooltip-total{font-weight:500;}
+  .caltooltip-breakdown{margin-top:4px;color:#D8D5CC;}
+  .caltooltip-notes{margin-top:4px;font-style:italic;color:#D8D5CC;}
+  .caltooltip-empty{color:#9AA0A6;}
 </style>
 </head>
 <body>
@@ -476,7 +485,7 @@ function renderAnalytics() {
     <div class="stat"><div class="n">${allLogs.length}</div><div class="l">total reps logged</div></div>
   `;
 
-  renderCalendarInto('overallCalendar', state.goals.flatMap(g => g.logs), 20);
+  renderCalendarInto('overallCalendar', state.goals, 20);
 
   const activeGoals = state.goals.filter(g => g.status === 'active');
   const repsCtx = document.getElementById('repsChart');
@@ -513,28 +522,44 @@ function renderAnalytics() {
 }
 
 // ---- Calendar heatmap (GitHub-contributions style), reused for the
-// overall Analytics view and each goal's detail page. ----
-function buildDayCounts(logsFlat) {
-  const map = {};
-  logsFlat.forEach(l => {
-    const key = new Date(logTs(l)).toDateString();
-    map[key] = (map[key] || 0) + 1;
+// overall Analytics view and each goal's detail page. Native `title`
+// tooltips were too slow/plain to read, so cells get a custom tooltip
+// instead, driven by a per-container day index and shown on hover (desktop)
+// or tap (mobile, via click + tap-elsewhere-to-dismiss).
+let calendarIndexes = {};
+let calTooltipEl = null;
+
+function buildCalendarIndex(goalsForCal) {
+  const index = {};
+  goalsForCal.forEach(g => {
+    g.logs.forEach(l => {
+      const key = new Date(logTs(l)).toDateString();
+      if (!index[key]) index[key] = { total: 0, byGoal: {}, notes: [] };
+      index[key].total++;
+      index[key].byGoal[g.name] = (index[key].byGoal[g.name] || 0) + 1;
+      const note = logNote(l);
+      if (note) index[key].notes.push(note);
+    });
   });
-  return map;
+  return index;
 }
-function renderCalendarInto(containerId, logsFlat, weeks) {
+
+function renderCalendarInto(containerId, goalsForCal, weeks) {
   weeks = weeks || 20;
-  const counts = buildDayCounts(logsFlat);
+  const container = document.getElementById(containerId);
+  if (!container) return;
+
+  const index = buildCalendarIndex(goalsForCal);
+  calendarIndexes[containerId] = index;
+
+  container.innerHTML = '';
+  if (!goalsForCal.some(g => g.logs.length)) { container.innerHTML = '<div class="empty">No activity yet.</div>'; return; }
+
   const today = new Date(); today.setHours(0, 0, 0, 0);
   const gridEnd = new Date(today); gridEnd.setDate(today.getDate() + (6 - today.getDay()));
   const totalDays = weeks * 7;
   const gridStart = new Date(gridEnd); gridStart.setDate(gridEnd.getDate() - totalDays + 1);
-  const maxCount = Math.max(1, ...Object.values(counts));
-
-  const container = document.getElementById(containerId);
-  if (!container) return;
-  container.innerHTML = '';
-  if (!logsFlat.length) { container.innerHTML = '<div class="empty">No activity yet.</div>'; return; }
+  const maxCount = Math.max(1, ...Object.values(index).map(v => v.total));
 
   const monthsRow = document.createElement('div');
   monthsRow.className = 'calmonths';
@@ -549,25 +574,100 @@ function renderCalendarInto(containerId, logsFlat, weeks) {
     monthsRow.appendChild(label);
   }
 
+  // gridStart always lands on a Sunday (totalDays is a multiple of 7), so
+  // row 0 = Sun, 1 = Mon, ... 6 = Sat — matches GitHub's day-label convention.
+  const dayLabels = document.createElement('div');
+  dayLabels.className = 'caldays';
+  ['', 'Mon', '', 'Wed', '', 'Fri', ''].forEach(txt => {
+    const s = document.createElement('span');
+    s.textContent = txt;
+    dayLabels.appendChild(s);
+  });
+
   const grid = document.createElement('div');
   grid.className = 'calgrid';
   for (let d = 0; d < totalDays; d++) {
     const day = new Date(gridStart); day.setDate(gridStart.getDate() + d);
-    const c = day > today ? 0 : (counts[day.toDateString()] || 0);
+    const isFuture = day > today;
+    const info = index[day.toDateString()];
+    const c = isFuture ? 0 : (info ? info.total : 0);
     const cell = document.createElement('div');
     cell.className = 'calcell';
-    const level = c === 0 ? 0 : (c >= maxCount ? 3 : (c > maxCount / 2 ? 2 : 1));
-    cell.dataset.level = level;
-    if (day <= today) cell.title = day.toLocaleDateString() + (c ? `: ${c} rep${c > 1 ? 's' : ''}` : ': no reps');
+    cell.dataset.level = c === 0 ? 0 : (c >= maxCount ? 3 : (c > maxCount / 2 ? 2 : 1));
+    if (!isFuture) cell.dataset.date = day.toDateString();
     grid.appendChild(cell);
   }
 
-  const scroller = document.createElement('div');
-  scroller.className = 'calwrap';
-  scroller.appendChild(grid);
+  const wrap = document.createElement('div');
+  wrap.className = 'calwrap';
+  wrap.appendChild(dayLabels);
+  wrap.appendChild(grid);
   container.appendChild(monthsRow);
-  container.appendChild(scroller);
+  container.appendChild(wrap);
+
+  if (!container.dataset.calBound) {
+    container.addEventListener('mouseover', handleCalHover);
+    container.addEventListener('mouseout', handleCalOut);
+    container.addEventListener('click', handleCalClick);
+    container.dataset.calBound = '1';
+  }
 }
+
+function ensureCalTooltip() {
+  if (!calTooltipEl) {
+    calTooltipEl = document.createElement('div');
+    calTooltipEl.className = 'caltooltip';
+    document.body.appendChild(calTooltipEl);
+  }
+  return calTooltipEl;
+}
+function showCalTooltip(cell) {
+  const containerId = cell.closest('[id]').id;
+  const info = (calendarIndexes[containerId] || {})[cell.dataset.date];
+  const dateObj = new Date(cell.dataset.date);
+  const tip = ensureCalTooltip();
+  const parts = [`<div class="caltooltip-date">${dateObj.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</div>`];
+  if (!info || !info.total) {
+    parts.push('<div class="caltooltip-empty">No reps logged</div>');
+  } else {
+    parts.push(`<div class="caltooltip-total">${info.total} rep${info.total > 1 ? 's' : ''}</div>`);
+    const goalNames = Object.keys(info.byGoal);
+    if (goalNames.length > 1) {
+      parts.push('<div class="caltooltip-breakdown">' + goalNames.map(n => `${escapeHtml(n)}: ${info.byGoal[n]}`).join('<br>') + '</div>');
+    }
+    if (info.notes.length) {
+      parts.push('<div class="caltooltip-notes">' + info.notes.map(n => '"' + escapeHtml(n) + '"').join('<br>') + '</div>');
+    }
+  }
+  tip.innerHTML = parts.join('');
+  tip.style.display = 'block';
+  const r = cell.getBoundingClientRect();
+  const tipRect = tip.getBoundingClientRect();
+  let left = r.left + r.width / 2 - tipRect.width / 2;
+  left = Math.max(8, Math.min(left, window.innerWidth - tipRect.width - 8));
+  let top = r.top - tipRect.height - 8;
+  if (top < 8) top = r.bottom + 8;
+  tip.style.left = left + 'px';
+  tip.style.top = top + 'px';
+  tip.classList.add('show');
+}
+function hideCalTooltip() {
+  if (calTooltipEl) calTooltipEl.classList.remove('show');
+}
+function handleCalHover(e) {
+  const cell = e.target.closest('.calcell');
+  if (cell && cell.dataset.date) showCalTooltip(cell);
+}
+function handleCalOut(e) {
+  if (e.target.closest('.calcell')) hideCalTooltip();
+}
+function handleCalClick(e) {
+  const cell = e.target.closest('.calcell');
+  if (!cell || !cell.dataset.date) return;
+  e.stopPropagation();
+  showCalTooltip(cell);
+}
+document.addEventListener('click', hideCalTooltip);
 
 // ---- Per-goal detail page ----
 function currentStreak(g) {
@@ -627,7 +727,7 @@ function renderDetail() {
     mosaic.appendChild(cell);
   }
 
-  renderCalendarInto('detailCalendar', g.logs, 20);
+  renderCalendarInto('detailCalendar', [g], 20);
 
   const journal = document.getElementById('detailJournal');
   journal.innerHTML = g.logs.length ? '' : '<div class="empty">No reps logged yet.</div>';
